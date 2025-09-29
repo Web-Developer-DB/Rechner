@@ -129,4 +129,4 @@ test('78 * 25 = 1950', async ({ page }) => {
 
 ## 📄 Lizenz
 
-MIT © 2025 – Dein Name
+MIT © 2025 – WebDevDB
