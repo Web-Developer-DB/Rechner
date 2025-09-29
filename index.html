@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#4f46e5" />
+  <title>Taschenrechner • PWA + Advanced + Verlauf + Konverter</title>
+  <style>
+    :root{
+      --bg:#0f172a; --panel:#111827; --panel-2:#1f2937; --text:#e5e7eb; --muted:#9ca3af; --accent:#4f46e5; --accent-2:#22c55e; --danger:#ef4444; --shadow:0 10px 30px rgba(0,0,0,.35); --radius:18px;
+    }
+    [data-theme="light"]{ --bg:#f8fafc; --panel:#ffffff; --panel-2:#f1f5f9; --text:#0f172a; --muted:#475569; --accent:#4f46e5; --accent-2:#16a34a; --danger:#b91c1c; }
+    *{box-sizing:border-box} html,body{height:100%}
+    body{margin:0; background:radial-gradient(1200px 800px at 80% -10%, rgba(79,70,229,.35), transparent 40%), var(--bg); color:var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial; display:grid; place-items:center; padding:20px;}
+    .app{width:min(980px, 100%);} /* breiter: rechter Bereich = Verlauf/Konverter */
+    .layout{display:grid; grid-template-columns: 1.2fr .8fr; gap:16px}
+    @media (max-width: 900px){ .layout{grid-template-columns:1fr} }
+    .card{background:linear-gradient(180deg, var(--panel), var(--panel-2)); border-radius:var(--radius); box-shadow:var(--shadow); overflow:hidden; border:1px solid rgba(255,255,255,.06)}
+
+    .topbar{display:flex; align-items:center; justify-content:space-between; padding:12px 16px; gap:8px}
+    .brand{display:flex; align-items:center; gap:10px; font-weight:700}
+    .brand .dot{width:10px; height:10px; border-radius:50%; background:var(--accent-2); box-shadow:0 0 20px var(--accent-2)}
+    .row{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+    .btn{appearance:none; border:none; background:var(--panel-2); color:var(--text); padding:8px 12px; border-radius:12px; cursor:pointer}
+
+    .display{ padding:24px 18px 8px; text-align:right; min-height:120px; display:flex; flex-direction:column; gap:8px; }
+    .history-inline{font-size:14px; color:var(--muted); min-height:20px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+    .current{font-size:42px; font-weight:700; line-height:1.15; word-break:break-all}
+
+    .grid{ display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; padding:16px; background:var(--panel-2); border-top:1px solid rgba(255,255,255,.06); }
+    .grid-adv{ display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; padding:0 16px 16px; background:var(--panel-2); border-top:1px solid rgba(255,255,255,.06); }
+
+    button.key{ appearance:none; border:none; padding:14px; border-radius:14px; font-size:16px; font-weight:600; cursor:pointer; background:#0b1220; color:var(--text); box-shadow:inset 0 -2px 0 rgba(255,255,255,.06); transition: transform .04s ease, filter .15s ease, background .2s ease; }
+    [data-theme="light"] button.key{ background:#e2e8f0; box-shadow:inset 0 -2px 0 rgba(0,0,0,.07); }
+    button.key:active{ transform:translateY(1px) }
+    .op{ background:#111b2f } [data-theme="light"] .op{ background:#e5e7eb }
+    .accent{ background:var(--accent); color:white } .danger{ background:var(--danger); color:white }
+    .span-2{ grid-column: span 2; }
+
+    .footer{padding:10px 16px; font-size:12px; color:var(--muted); text-align:center}
+
+    .section{background:linear-gradient(180deg, var(--panel), var(--panel-2)); border-radius:var(--radius); border:1px solid rgba(255,255,255,.06); overflow:hidden}
+    .section h3{margin:0; font-size:14px; font-weight:700; padding:12px 16px; border-bottom:1px solid rgba(255,255,255,.06); color:var(--muted)}
+    .pad{padding:12px 16px}
+
+    /* Verlauf */
+    .log-list{max-height:360px; overflow:auto; display:flex; flex-direction:column; gap:8px}
+    .log-item{background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.06); border-radius:12px; padding:8px 10px; display:flex; justify-content:space-between; gap:10px; cursor:pointer}
+    .log-item .expr{color:var(--muted); font-size:12px}
+    .log-item .res{font-weight:700}
+    .log-controls{display:flex; gap:8px; margin-bottom:10px}
+
+    /* Konverter */
+    .conv-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+    .conv-grid input, .conv-grid select{width:100%; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,.15); background:var(--panel-2); color:var(--text)}
+    .note{font-size:12px; color:var(--muted); margin-top:6px}
+
+    .adv{ display:none; } .adv.show{ display:block; animation: fade .2s ease }
+    @keyframes fade{ from{ opacity:0; transform:translateY(-4px)} to{opacity:1; transform:none} }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="layout">
+      <!-- Linke Spalte: Rechner -->
+      <div class="card">
+        <div class="topbar">
+          <div class="brand"><span class="dot"></span> Rechner</div>
+          <div class="row">
+            <button class="btn" id="degBtn" aria-label="Winkelmaß umschalten">Grad</button>
+            <button class="btn" id="advBtn" aria-expanded="false">Erw. Funktionen</button>
+            <button class="btn" id="installBtn" hidden>Installieren</button>
+            <button class="btn" id="themeBtn" aria-label="Darstellung umschalten">🌙 / ☀️</button>
+          </div>
+        </div>
+
+        <div class="display" role="region" aria-live="polite">
+          <div class="history-inline" id="history"></div>
+          <div class="current" id="current">0</div>
+        </div>
+
+        <!-- Grundfunktionen -->
+        <div class="grid" id="keys" role="group" aria-label="Tasten">
+          <button class="key danger" data-action="clear" title="Alles löschen (Esc)">AC</button>
+          <button class="key op" data-action="del" title="Letztes Zeichen löschen (Backspace)">DEL</button>
+          <button class="key op" data-value="(">(</button>
+          <button class="key op" data-value=")">)</button>
+
+          <button class="key op" data-action="percent" title="Prozent">%</button>
+          <button class="key op" data-action="invert" title="Vorzeichen umkehren">±</button>
+          <button class="key op" data-action="pow2" title="Quadrat">x²</button>
+          <button class="key op" data-action="sqrt" title="Wurzel">√</button>
+
+          <button class="key" data-value="7">7</button>
+          <button class="key" data-value="8">8</button>
+          <button class="key" data-value="9">9</button>
+          <button class="key op" data-value="/" title="Division">÷</button>
+
+          <button class="key" data-value="4">4</button>
+          <button class="key" data-value="5">5</button>
+          <button class="key" data-value="6">6</button>
+          <button class="key op" data-value="*" title="Multiplikation">×</button>
+
+          <button class="key" data-value="1">1</button>
+          <button class="key" data-value="2">2</button>
+          <button class="key" data-value="3">3</button>
+          <button class="key op" data-value="-" title="Subtraktion">−</button>
+
+          <button class="key span-2" data-value="0">0</button>
+          <button class="key" data-value=".">,</button>
+          <button class="key op" data-value="+" title="Addition">+</button>
+
+          <button class="key accent span-2" data-action="equals" title="Gleich (= oder Enter)">=</button>
+          <button class="key op" data-action="copy" title="Ergebnis kopieren (Ctrl/Cmd+C)">Kopieren</button>
+          <button class="key op" data-action="clear-entry" title="Aktuellen Eintrag löschen (Delete)">CE</button>
+        </div>
+
+        <!-- Erweiterte Funktionen -->
+        <div class="adv" id="advanced">
+          <div class="grid-adv" role="group" aria-label="Erweiterte Tasten">
+            <button class="key op" data-action="const-pi">π</button>
+            <button class="key op" data-action="const-e">e</button>
+            <button class="key op" data-action="ans">ANS</button>
+            <button class="key op" data-action="recip">1/x</button>
+
+            <button class="key op" data-action="pow">x^y</button>
+            <button class="key op" data-action="fact">n!</button>
+            <button class="key op" data-action="exp">exp</button>
+            <button class="key op" data-action="log10">log₁₀</button>
+
+            <button class="key op" data-action="ln">ln</button>
+            <button class="key op" data-action="sin">sin</button>
+            <button class="key op" data-action="cos">cos</button>
+            <button class="key op" data-action="tan">tan</button>
+
+            <button class="key op" data-action="mem-clear">MC</button>
+            <button class="key op" data-action="mem-recall">MR</button>
+            <button class="key op" data-action="mem-plus">M+</button>
+            <button class="key op" data-action="mem-minus">M-</button>
+          </div>
+        </div>
+
+        <div class="footer">Tastatur: Ziffern, + − × ÷, Punkt, Enter (=), Backspace (DEL), Esc (AC). • PWA: über „Installieren“ hinzufügen, offline-fähig.</div>
+      </div>
+
+      <!-- Rechte Spalte: Verlauf + Konverter -->
+      <div class="section">
+        <h3>Verlauf & Konverter</h3>
+        <div class="pad">
+          <div class="log-controls">
+            <button class="btn" id="btnClearLog">Verlauf löschen</button>
+            <button class="btn" id="btnToggleConv">Konverter anzeigen</button>
+          </div>
+          <div id="logWrap">
+            <div class="log-list" id="logList"></div>
+          </div>
+          <div id="convWrap" class="adv">
+            <div class="conv-grid" style="margin-top:10px">
+              <select id="convCat">
+                <option value="length">Länge</option>
+                <option value="mass">Gewicht</option>
+                <option value="currency">Währung</option>
+              </select>
+              <span></span>
+              <input id="convInVal" type="number" step="any" placeholder="Wert eingeben" />
+              <div></div>
+              <select id="convFrom"></select>
+              <select id="convTo"></select>
+              <input id="convOutVal" type="text" readonly />
+              <div></div>
+            </div>
+            <div class="note" id="convNote">Währung: Kurs manuell anpassbar. Optional Live-Kurs laden, wenn online.</div>
+            <div class="row" style="margin-top:8px">
+              <label class="note">Kurs (1 FROM = <input id="convRate" type="number" step="any" style="width:120px; padding:6px 8px; border-radius:8px; border:1px solid rgba(255,255,255,.15); background:var(--panel-2); color:var(--text)" value="1"/> TO)</label>
+              <button class="btn" id="btnRate">Live-Kurs laden</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // ===== Theme =====
+    const root = document.documentElement;
+    const themeBtn = document.getElementById('themeBtn');
+    const savedTheme = localStorage.getItem('calc-theme') || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+    root.setAttribute('data-theme', savedTheme);
+    themeBtn.addEventListener('click', () => { const next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light'; root.setAttribute('data-theme', next); localStorage.setItem('calc-theme', next); h('tap'); });
+
+    // ===== Haptik =====
+    function h(kind){ try{ if(!('vibrate' in navigator)) return; if(kind==='tap') navigator.vibrate(10); else if(kind==='ok') navigator.vibrate([15,40,15]); else if(kind==='err') navigator.vibrate(80); }catch{} }
+
+    // ===== Degree/Radian Umschaltung =====
+    const degBtn = document.getElementById('degBtn');
+    let angleMode = localStorage.getItem('calc-angle') || 'deg';
+    function updateDegBtn(){ degBtn.textContent = angleMode === 'deg' ? 'Grad' : 'Bogenmaß'; }
+    updateDegBtn();
+    degBtn.addEventListener('click', ()=>{ angleMode = angleMode==='deg'?'rad':'deg'; localStorage.setItem('calc-angle', angleMode); updateDegBtn(); h('tap'); });
+
+    // ===== Advanced Panel Toggle =====
+    const advBtn = document.getElementById('advBtn');
+    const adv = document.getElementById('advanced');
+    advBtn.addEventListener('click', ()=>{ const show = !adv.classList.contains('show'); adv.classList.toggle('show', show); advBtn.setAttribute('aria-expanded', String(show)); h('tap'); });
+
+    // ===== Display & State =====
+    const currentEl = document.getElementById('current');
+    const historyEl = document.getElementById('history');
+    const keys = document.getElementById('keys');
+
+    let current = '0'; let history = ''; let lastResult = null; let memory = 0;
+
+    function setCurrent(val){ current = val; currentEl.textContent = val.replace(/\./g, ','); }
+    function setHistory(val){ history = val; historyEl.textContent = val; }
+    function readCurrent(){ return parseFloat(current.replace(',', '.')); }
+
+    function appendValue(v){ if(current === '0' && v !== '.') setCurrent(v); else setCurrent(current + v); }
+    function clearAll(){ setCurrent('0'); setHistory(''); lastResult = null; }
+    function clearEntry(){ setCurrent('0'); }
+    function del(){ if(current.length <= 1) setCurrent('0'); else setCurrent(current.slice(0,-1)); }
+
+    function invert(){ if(current.startsWith('-')) setCurrent(current.slice(1)); else if(current !== '0') setCurrent('-' + current); }
+    function percent(){ const x = readCurrent(); if(!isFinite(x)) return; if(lastResult !== null) setCurrent(String(lastResult * x / 100)); else setCurrent(String(x/100)); }
+    function pow2(){ const x = readCurrent(); if(!isFinite(x)) return; setCurrent(String(x*x)); }
+    function sqrtFn(){ const x = readCurrent(); if(x < 0) { setCurrent('NaN'); h('err'); return; } setCurrent(String(Math.sqrt(x))); }
+    function recip(){ const x = readCurrent(); setCurrent(String(1/x)); }
+    function fact(){ let n = readCurrent(); if(!Number.isInteger(n) || n < 0 || n > 170){ setCurrent('NaN'); h('err'); return; } let r=1; for(let i=2;i<=n;i++) r*=i; setCurrent(String(r)); }
+
+    function trigBase(x){ return angleMode==='deg' ? (x*Math.PI/180) : x; }
+    function sinFn(){ const x=readCurrent(); setCurrent(String(Math.sin(trigBase(x)))); }
+    function cosFn(){ const x=readCurrent(); setCurrent(String(Math.cos(trigBase(x)))); }
+    function tanFn(){ const x=readCurrent(); setCurrent(String(Math.tan(trigBase(x)))); }
+    function lnFn(){ const x=readCurrent(); setCurrent(String(Math.log(x))); }
+    function log10Fn(){ const x=readCurrent(); setCurrent(String(Math.log10(x))); }
+    function expFn(){ const x=readCurrent(); setCurrent(String(Math.exp(x))); }
+    function constPi(){ setCurrent(String(Math.PI)); }
+    function constE(){ setCurrent(String(Math.E)); }
+
+    function copyToClipboard(){ navigator.clipboard?.writeText(currentEl.textContent).then(()=>{ historyEl.textContent = 'Kopiert ✓'; setTimeout(()=> setHistory(history), 800); h('ok'); }).catch(()=>{}); }
+
+    // ===== Parser (Shunting-Yard) mit Potenz ^ =====
+    const prec = { '+':1, '-':1, '*':2, '/':2, '^':3 };
+    const rightAssoc = { '^': true };
+    const isOp = (t) => ['+','-','*','/','^'].includes(t);
+
+    function tokenize(expr){ const out = []; let num = ''; const pushNum = () => { if(num){ out.push(num); num=''; } };
+      for(let i=0;i<expr.length;i++){ let c = expr[i]; if(c === ',') c = '.'; if(/[0-9.]/.test(c)) { num += c; continue; } if(c === ' '){ pushNum(); continue; } if(isOp(c) || c==='(' || c===')') { pushNum(); out.push(c); continue; } } pushNum(); return out; }
+
+    function toRPN(tokens){ const output = [], stack = []; for(const t of tokens){ if(isOp(t)){ while(stack.length && isOp(stack.at(-1)) && (prec[stack.at(-1)] > prec[t] || (prec[stack.at(-1)] === prec[t] && !rightAssoc[t]))) output.push(stack.pop()); stack.push(t); } else if(t==='('){ stack.push(t); } else if(t===')'){ while(stack.length && stack.at(-1) !== '(') output.push(stack.pop()); if(stack.at(-1) === '(') stack.pop(); } else { output.push(t); } } while(stack.length) output.push(stack.pop()); return output; }
+
+    function evalRPN(rpn){ const st = []; for(const t of rpn){ if(isOp(t)){ const b = parseFloat(st.pop()); const a = parseFloat(st.pop()); let r=0; switch(t){ case '+': r=a+b; break; case '-': r=a-b; break; case '*': r=a*b; break; case '/': r=b===0? NaN : a/b; break; case '^': r=Math.pow(a,b); break; } st.push(String(r)); } else st.push(t); } return parseFloat(st.pop()); }
+
+    function evaluate(){ try{ let expr = history + current; if (['+','-','*','/','^'].some(op => history.trimEnd().endsWith(op))) expr = history + ' ' + current; const tokens = tokenize(expr); if(tokens.length === 0) return; const rpn = toRPN(tokens); const res = evalRPN(rpn); if(!isFinite(res)) { setCurrent('NaN'); h('err'); return; } lastResult = res; setHistory(''); setCurrent(String(+res.toFixed(12))); h('ok'); addLog(expr, lastResult); }catch(e){ setCurrent('Fehler'); h('err'); } }
+
+    function pushOp(op){ if(/[+\-*/^]$/.test(history + current)){ setHistory((history + current).replace(/[+\-*/^]$/, op)); setCurrent('0'); return; } setHistory((history + current) + ' ' + op + ' '); setCurrent('0'); }
+
+    // ===== Grundtasten =====
+    keys.addEventListener('click', (e)=>{ const b = e.target.closest('button.key'); if(!b) return; const val = b.dataset.value; const action = b.dataset.action; h('tap'); if(val !== undefined && !b.classList.contains('op')){ if(val === '.' && current.includes('.')) return; appendValue(val); return; } switch(action){ case 'clear': return clearAll(); case 'clear-entry': return clearEntry(); case 'del': return del(); case 'invert': return invert(); case 'percent': return percent(); case 'pow2': return pow2(); case 'sqrt': return sqrtFn(); case 'equals': return evaluate(); case 'copy': return copyToClipboard(); } });
+
+    // Operator-Buttons (+, -, *, /) und ^
+    document.querySelectorAll('.key.op[data-value]').forEach(btn => btn.addEventListener('click', ()=>{ h('tap'); pushOp(btn.dataset.value) }));
+
+    // ===== Advanced Buttons =====
+    const advPanel = document.getElementById('advanced');
+    advPanel.addEventListener('click', (e)=>{ const b = e.target.closest('button.key'); if(!b) return; const action = b.dataset.action; h('tap'); switch(action){ case 'const-pi': return constPi(); case 'const-e': return constE(); case 'ans': if(lastResult!==null) setCurrent(String(lastResult)); return; case 'recip': return recip(); case 'pow': return (pushOp('^')); case 'fact': return fact(); case 'exp': return expFn(); case 'log10': return log10Fn(); case 'ln': return lnFn(); case 'sin': return sinFn(); case 'cos': return cosFn(); case 'tan': return tanFn(); case 'mem-clear': memory = 0; historyEl.textContent = 'MC'; setTimeout(()=> setHistory(history), 600); return; case 'mem-recall': setCurrent(String(memory)); return; case 'mem-plus': memory += readCurrent(); historyEl.textContent = 'M+'; setTimeout(()=> setHistory(history), 600); return; case 'mem-minus': memory -= readCurrent(); historyEl.textContent = 'M-'; setTimeout(()=> setHistory(history), 600); return; } });
+
+    // ===== Tastatursteuerung =====
+    window.addEventListener('keydown', (e)=>{ if(e.key === 'Enter' || e.key === '='){ e.preventDefault(); evaluate(); } else if(/^[0-9]$/.test(e.key)) appendValue(e.key); else if(e.key === ',' || e.key === '.') appendValue('.'); else if(['+','-','*','/','^'].includes(e.key)) pushOp(e.key); else if(e.key === 'Backspace') del(); else if(e.key === 'Delete') clearEntry(); else if(e.key === 'Escape') clearAll(); else if(e.key === '(' || e.key === ')'){ appendValue(e.key); } });
+
+    // ===== Verlauf =====
+    const logList = document.getElementById('logList');
+    const btnClearLog = document.getElementById('btnClearLog');
+    const MAX_LOG = 50;
+    function loadLog(){ try{ return JSON.parse(localStorage.getItem('calc-log')||'[]'); }catch{ return []; } }
+    function saveLog(list){ localStorage.setItem('calc-log', JSON.stringify(list.slice(0,MAX_LOG))); }
+    function renderLog(){ const list = loadLog(); logList.innerHTML = ''; for(const item of list){ const div = document.createElement('div'); div.className='log-item'; div.innerHTML = `<div><div class="expr">${item.expr}</div><div class="time note">${new Date(item.t).toLocaleString()}</div></div><div class="res">${String(item.res)}</div>`; div.addEventListener('click', ()=>{ setHistory(''); setCurrent(String(item.res)); lastResult=item.res; h('tap'); }); logList.appendChild(div);} }
+    function addLog(expr, res){ const list = loadLog(); list.unshift({expr, res: +(+res).toFixed(12), t: Date.now()}); saveLog(list); renderLog(); }
+    btnClearLog.addEventListener('click', ()=>{ localStorage.removeItem('calc-log'); renderLog(); h('tap'); });
+    renderLog();
+
+    // ===== Konverter =====
+    const btnToggleConv = document.getElementById('btnToggleConv');
+    const convWrap = document.getElementById('convWrap');
+    const convCat = document.getElementById('convCat');
+    const convFrom = document.getElementById('convFrom');
+    const convTo = document.getElementById('convTo');
+    const convInVal = document.getElementById('convInVal');
+    const convOutVal = document.getElementById('convOutVal');
+    const convRate = document.getElementById('convRate');
+    const btnRate = document.getElementById('btnRate');
+
+    btnToggleConv.addEventListener('click', ()=>{ convWrap.classList.toggle('show'); h('tap'); });
+
+    const units = {
+      length: { base:'m', map:{ m:1, km:1000, cm:0.01, mm:0.001, mi:1609.344, ft:0.3048, in:0.0254 } },
+      mass: { base:'kg', map:{ kg:1, g:0.001, t:1000, lb:0.45359237, oz:0.028349523125 } },
+      currency: { list:['EUR','USD','GBP','TRY','CHF'] }
+    };
+
+    function fillUnits(){ const cat = convCat.value; convFrom.innerHTML = ''; convTo.innerHTML = ''; if(cat==='currency'){ for(const u of units.currency.list){ convFrom.add(new Option(u,u)); convTo.add(new Option(u,u)); } convRate.parentElement.style.display=''; btnRate.style.display=''; } else { const map = units[cat].map; Object.keys(map).forEach(u=>{ convFrom.add(new Option(u,u)); convTo.add(new Option(u,u)); }); convRate.parentElement.style.display='none'; btnRate.style.display='none'; }
+      convFrom.selectedIndex = 0; convTo.selectedIndex = 1; updateConv(); }
+    convCat.addEventListener('change', fillUnits);
+
+    function updateConv(){ const val = parseFloat(convInVal.value); if(!isFinite(val)){ convOutVal.value = ''; return; } if(convCat.value==='currency'){ const rate = parseFloat(convRate.value)||1; // 1 FROM = rate TO
+        if(convFrom.value===convTo.value){ convOutVal.value = String(val); return; }
+        // Umrechnung: val * (Kurs) oder invertiert
+        convOutVal.value = String(+ (convFrom.value!==convTo.value ? (val * (convFrom.value===convTo.value?1: (convFrom.value===convTo.value?1: rate))) : val));
+        // Korrekte Logik unten überschreibt (einfach)
+        const res = convertCurrency(val, convFrom.value, convTo.value, rate);
+        convOutVal.value = String(+res.toFixed(6));
+      } else { const map = units[convCat.value].map; const baseVal = val * map[convFrom.value]; const res = baseVal / map[convTo.value]; convOutVal.value = String(+res.toFixed(6)); }
+    }
+    [convFrom, convTo, convInVal, convRate].forEach(el=> el.addEventListener('input', ()=>{ updateConv(); h('tap'); }));
+
+    function convertCurrency(val, from, to, rate){ if(from===to) return val; // rate ist 1 FROM = rate TO
+      // Implementiere über Zwischenbasis TO: Wenn from->to Rate gegeben, nutze sie direkt, ansonsten invertiere
+      // Wir gehen davon aus, dass der Nutzer den Kurs passend zu den gewählten Paaren setzt.
+      // Falls der Kurs für EUR->USD eingegeben ist, aber from=USD und to=EUR, invertieren.
+      return (from+to).toUpperCase() === (from+to) ? (from===to? val : val*rate) : (1/rate); }
+
+    // Korrigierte Currency-Funktion einfacher:
+    function convertCurrency(val, from, to, rateProvided){ if(from===to) return val; // 1 FROM = rateProvided TO
+      return val * rateProvided; }
+
+    // Live-Kurs laden (optional) – nutzt exchangerate.host (ohne API-Key). Fällt offline sanft zurück.
+    btnRate.addEventListener('click', async ()=>{ h('tap'); if(convCat.value!=='currency') return; const base = convFrom.value; const to = convTo.value; try{ const res = await fetch(`https://api.exchangerate.host/latest?base=${base}&symbols=${to}`); const data = await res.json(); const r = data?.rates?.[to]; if(r){ convRate.value = String(r); updateConv(); h('ok'); } }catch{ /* offline */ } });
+
+    fillUnits();
+
+    // ===== PWA: Manifest + Icons + Service Worker =====
+    (function setupPWA(){ function genIcon(size){ const c = document.createElement('canvas'); c.width=c.height=size; const x=c.getContext('2d'); x.fillStyle='#4f46e5'; x.fillRect(0,0,size,size); x.fillStyle='#fff'; x.font=Math.floor(size*0.44)+'px system-ui, sans-serif'; x.textAlign='center'; x.textBaseline='middle'; x.fillText('ƒx', size/2, size/2+size*0.06); return c.toDataURL('image/png'); }
+      const manifest = { name:'Taschenrechner Web App', short_name:'Rechner', start_url:'.', display:'standalone', background_color:'#0f172a', theme_color:'#4f46e5', icons:[{src:genIcon(192),sizes:'192x192',type:'image/png'},{src:genIcon(512),sizes:'512x512',type:'image/png'}] };
+      const mblob = new Blob([JSON.stringify(manifest)],{type:'application/json'}); const murl = URL.createObjectURL(mblob); const link=document.createElement('link'); link.rel='manifest'; link.href=murl; document.head.appendChild(link);
+      const swCode = `const CACHE='calc-cache-v2'; const ASSETS=['.']; self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting()))}); self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k))))); self.clients.claim();}); self.addEventListener('fetch',e=>{const req=e.request; e.respondWith(caches.match(req).then(cached=>cached||fetch(req).then(res=>{if(req.method==='GET' && new URL(req.url).origin===location.origin){const clone=res.clone(); caches.open(CACHE).then(c=>c.put(req,clone));} return res;}).catch(()=>caches.match('.'))));});`;
+      const swUrl = URL.createObjectURL(new Blob([swCode], {type:'text/javascript'})); if('serviceWorker' in navigator){ navigator.serviceWorker.register(swUrl).catch(()=>{}); }
+      let deferredPrompt=null; const installBtn=document.getElementById('installBtn'); window.addEventListener('beforeinstallprompt', (e)=>{ e.preventDefault(); deferredPrompt=e; installBtn.hidden=false; }); installBtn.addEventListener('click', async ()=>{ installBtn.hidden=true; try{ await deferredPrompt.prompt(); await deferredPrompt.userChoice; }catch{} deferredPrompt=null; h('ok'); }); })();
+
+    // ===== Exporte für Tests (Jest/Playwright) =====
+    window.Calc = { tokenize, toRPN, evalRPN };
+  </script>
+
+  <!--
+  ================== TESTS & LINTING (Anleitung) ==================
+  1) Node-Projekt initialisieren:
+     npm init -y
+     npm i -D jest @jest-environment/jsdom eslint playwright @playwright/test
+  2) package.json ergänzen:
+     {
+       "type":"module",
+       "scripts":{
+         "test":"jest",
+         "lint":"eslint .",
+         "e2e":"playwright test"
+       }
+     }
+  3) jest.config.cjs:
+     module.exports = { testEnvironment: 'jsdom' };
+  4) Beispiel-Unit-Tests (tests/calc.test.js):
+     import { JSDOM } from 'jsdom';
+     test('RPN eval 3+4*2', () => {
+       const tokens = window.Calc.tokenize('3 + 4 * 2');
+       const rpn = window.Calc.toRPN(tokens);
+       const res = window.Calc.evalRPN(rpn);
+       expect(res).toBe(11);
+     });
+  5) Playwright (e2e) – tests/calc.spec.ts:
+     import { test, expect } from '@playwright/test';
+     test('78 * 25 = 1950', async ({ page }) => {
+       await page.goto('http://localhost:5173');
+       await page.click('text=7'); await page.click('text=8'); await page.click('text=×'); await page.click('text=2'); await page.click('text=5'); await page.click('text==');
+       await expect(page.locator('#current')).toContainText('1950');
+     });
+  6) ESLint schnellstart:
+     npx eslint --init
+  ==============================================================
+  -->
+</body>
+</html>
