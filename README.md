@@ -171,14 +171,5 @@ Für produktive Deployments sollte das dynamische Manifest ggf. durch statische 
 
 ---
 
-## Weiterführende Ideen
 
-- Weitere Konverter-Kategorien (Temperatur, Volumen, Energie, Zeit).
-- Undo-/Redo-Schritte im Verlauf.
-- Internationalisierung (z. B. Sprachenumschaltung, Zahlformatierung).
-- Verbesserte PWA-Assets & deploy-spezifische Service-Worker-Strategien.
-- Integration einer robusteren Persistenz (z. B. IndexedDB) für größere Verlaufsdaten.
-
----
-
-Viel Spaß beim Rechnen! Bei Fragen oder Erweiterungswünschen gerne melden. 😊
+Viel Spaß beim Rechnen!
