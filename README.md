@@ -1,129 +1,103 @@
-# 📱 Taschenrechner Web App (PWA)
+# 📱 Taschenrechner React PWA
 
-Ein moderner Taschenrechner als **Progressive Web App** mit **erweiterten wissenschaftlichen Funktionen**, **Haptik auf Mobilgeräten**, **Verlaufsanzeige**, **Einheiten- & Währungskonverter** sowie **Tests & Linting**.
-
----
-
-## ✨ Features
-
-* ✅ **Grundfunktionen**: +, −, ×, ÷, Prozent, ±, √, x², CE, AC
-* ✅ **Wissenschaftlich**: π, e, sin, cos, tan, ln, log₁₀, exp, Fakultät, Potenzen, Speicher (MC, MR, M+, M−)
-* ✅ **Eingabe-Historie**: klickbarer Verlauf (lokal gespeichert, bis zu 50 Rechnungen)
-* ✅ **Einheiten-Konverter**:
-
-  * Länge: m, km, cm, mm, mi, ft, in
-  * Gewicht: kg, g, t, lb, oz
-  * Währung: EUR, USD, GBP, TRY, CHF (manuelle Eingabe oder Live-Kurs via API)
-* ✅ **Haptisches Feedback** (Vibration auf Mobilgeräten)
-* ✅ **Dark-/Light-Mode** (automatisch oder manuell)
-* ✅ **PWA**:
-
-  * Installierbar auf Handy/PC
-  * Offline-fähig durch Service Worker
-  * Dynamisch generierte App-Icons
+Ein moderner, reaktiver Taschenrechner mit wissenschaftlichen Funktionen, klickbarem Verlauf, Einheiten- und Währungskonverter sowie optionaler PWA-Installation. Die Anwendung wurde in eine modulare React/Vite-Codebasis überführt, damit Struktur und Wartbarkeit klarer sind.
 
 ---
 
-## 🚀 Installation & Nutzung
+## ✨ Highlights
 
-### 1. Direkt im Browser
-
-* Datei `index.html` im Browser öffnen → läuft sofort.
-
-### 2. Als PWA installieren
-
-* Im Browser „Installieren“ wählen (oder Installations-Button in der App klicken).
-* Funktioniert offline.
+- **Umfangreicher Rechner**: Grundrechenarten, Prozent, Vorzeichen, Potenzen, Wurzel.
+- **Wissenschaftlich**: π, e, sin, cos, tan, ln, log₁₀, exp, Fakultät, Speicherfunktionen.
+- **Smartes UX**: Dark-/Light-Mode (mit LocalStorage), Grad/Bogenmaß-Umschaltung, Haptik (Vibration).
+- **Verlauf**: Bis zu 50 Einträge, lokal gespeichert, per Klick wiederverwendbar.
+- **Konverter**: Länge, Gewicht, Währung (manueller Kurs oder Live-Rate via API).
+- **PWA-ready**: Dynamisches Manifest, Service Worker, Installations-Button.
 
 ---
 
-## 🧪 Entwicklung & Tests
+## 🛠️ Tech-Stack
 
-### Lokale Entwicklung
+- [React 18](https://react.dev/) + [Vite](https://vitejs.dev/)
+- Lokales State-Management via Hooks (`useCalculator`, `useHistoryLog`, `useConverter`)
+- CSS mit Custom Properties (Dark-/Light-Theming)
+- Progressive Web App Setup (Manifest + Service Worker)
+
+---
+
+## 🚀 Los geht's
 
 ```bash
-# Repo klonen
-git clone https://github.com/deinname/taschenrechner-pwa.git
-cd taschenrechner-pwa
+# Abhängigkeiten installieren
+npm install
 
-# (optional) lokalen Server starten, z. B. mit Vite oder serve
-npm create vite@latest .
+# Entwicklungsserver starten
 npm run dev
+
+# Produktion bauen
+npm run build
+
+# Production-Bundle lokal ansehen
+npm run preview
 ```
 
-### Linting
+Standardmäßig läuft der Dev-Server unter `http://localhost:5173`.
 
-```bash
-npm init -y
-npm i -D eslint
-npx eslint --init
-npm run lint
-```
+---
 
-### Unit-Tests mit Jest
+## 🧪 Tests & Qualität
 
-```bash
-npm i -D jest @jest-environment/jsdom
-npm run test
-```
+- `npm run lint` – ESLint (Konfiguration bitte nach Bedarf ergänzen)
+- `npm run test` – Vitest (Testdateien noch hinzufügen)
 
-Beispiel (`tests/calc.test.js`):
+Empfehlungen:
 
-```js
-import { JSDOM } from 'jsdom';
-
-test('3 + 4 * 2 = 11', () => {
-  const tokens = window.Calc.tokenize('3 + 4 * 2');
-  const rpn = window.Calc.toRPN(tokens);
-  const res = window.Calc.evalRPN(rpn);
-  expect(res).toBe(11);
-});
-```
-
-### End-to-End-Tests mit Playwright
-
-```bash
-npm i -D @playwright/test
-npx playwright test
-```
-
-Beispiel (`tests/calc.spec.ts`):
-
-```ts
-import { test, expect } from '@playwright/test';
-
-test('78 * 25 = 1950', async ({ page }) => {
-  await page.goto('http://localhost:5173');
-  await page.click('text=7');
-  await page.click('text=8');
-  await page.click('text=×');
-  await page.click('text=2');
-  await page.click('text=5');
-  await page.click('text==');
-  await expect(page.locator('#current')).toContainText('1950');
-});
-```
+- Unit-Tests für Parser/Mathe-Utilities (`src/utils/math.js`)
+- Playwright-Tests für wichtige UI-Flows (z. B. 78 × 25 = 1950)
 
 ---
 
 ## 📂 Projektstruktur
 
 ```
-📦 taschenrechner-pwa
- ┣ 📜 index.html        # Haupt-App (alle Funktionen in einer Datei)
- ┣ 📜 README.md         # Dokumentation
- ┣ 📂 tests             # Jest & Playwright Tests
- ┗ 📜 .eslintrc.js      # ESLint-Konfiguration
+.
+├── index.html
+├── package.json
+├── vite.config.js
+└── src
+    ├── App.jsx
+    ├── main.jsx
+    ├── components
+    │   ├── calculator
+    │   │   └── Calculator.jsx
+    │   ├── converter
+    │   │   └── Converter.jsx
+    │   └── history
+    │       └── HistoryPanel.jsx
+    ├── hooks
+    │   ├── useCalculator.js
+    │   ├── useConverter.js
+    │   ├── useHistoryLog.js
+    │   └── useTheme.js
+    ├── pwa
+    │   └── usePwaSetup.js
+    ├── styles
+    │   └── app.css
+    └── utils
+        ├── haptics.js
+        ├── math.js
+        └── number.js
 ```
+
+Diese Struktur trennt UI, State-Logik, Utilities und Styling klar voneinander.
 
 ---
 
-## 🔮 Roadmap
+## 🧭 Roadmap-Ideen
 
-* [ ] Erweiterte Verlaufssuche
-* [ ] Undo-/Redo-Funktion
-* [ ] Mehr Konverter-Kategorien (Temperatur, Volumen)
-* [ ] Deployment als GitHub Pages
+- Weitere Konverter-Kategorien (Temperatur, Volumen, Energie)
+- Undo-/Redo im Verlauf
+- Umfangreichere Testabdeckung (Vitest + Playwright)
+- Deployment via GitHub Pages oder Vercel
 
 ---
 
